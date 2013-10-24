@@ -146,5 +146,12 @@ This will analyse the 'coords.dat' and try to correct the mistakes by the relati
 
 When done a new `/home/user/myprjs/test/coords.dat` will be saved.
 
+
+### 6 - Estimate the position of the mouse backbone:
+
+    $ python /home/user/mt/calc_backbone.py /home/user/myprjs/test -b 5
+
+    This will calculate the line that divide the mouse blob in half, basing in N number of points (option -b).
+
 # Have Fun
     
