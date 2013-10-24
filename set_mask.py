@@ -75,7 +75,7 @@ def main( prj, delay, jump ):
     while True:
         # get the frame from the video
         (ret, frame) = capture.read()
-
+        
         if not ret:
             break
 
@@ -99,6 +99,9 @@ def main( prj, delay, jump ):
             laser_color = (0, 0, 0)
 
         cv2.polylines( frame, laser_points, True, laser_color, 2 )
+
+
+        cv2.polylines( frame, poly_points, True, (0,0,255), 1 )
 
         for (i,(x, y)) in enumerate(poly_points[0]):
             if( curr_point == i ):
@@ -148,7 +151,7 @@ def run( args, io ):
     # open the project
     check_dir( io, args.project, "Project File" )
     prj = Project( args.project )
-
+    
     main( prj, args.delay, args.jump )
 
     cv2.destroyAllWindows()

@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import math
 
 from data import *
 from utils import *
@@ -8,7 +9,7 @@ from utils import *
 #======================================================================================================================
 # Mouse detection functions
 #======================================================================================================================
-def detect( io, video_file, thresh, laser, poly, show_video, delay, jump ):
+def detect( io, video_file, thresh, laser, poly, show_video, delay, jump, fade_margin=False ):
 
     # split the indivitual thresholds
     (thresh1, thresh2) = thresh
@@ -17,8 +18,8 @@ def detect( io, video_file, thresh, laser, poly, show_video, delay, jump ):
     capture = cv2.VideoCapture( video_file )
 
     frame_count = capture.get( cv2.cv.CV_CAP_PROP_FRAME_COUNT )
-    frame_height = capture.get( cv2.cv.CV_CAP_PROP_FRAME_HEIGHT )
-    frame_width  = capture.get( cv2.cv.CV_CAP_PROP_FRAME_WIDTH )
+    frame_height = int(capture.get( cv2.cv.CV_CAP_PROP_FRAME_HEIGHT ))
+    frame_width  = int(capture.get( cv2.cv.CV_CAP_PROP_FRAME_WIDTH ))
 
     # start the  counter
     io.start_progress( frame_count )
@@ -27,12 +28,34 @@ def detect( io, video_file, thresh, laser, poly, show_video, delay, jump ):
     poly = [np.array( poly, dtype=np.int32 )]
     mask = make_mask( poly, frame_height, frame_width )
     mask_not = make_mask_not( poly, frame_height, frame_width )
+
+    if fade_margin: 
+        margin = None
+        p1_left_x_cut = min( poly[0][0][0], poly[0][3][0])
+        p2_left_x_cut = max( poly[0][0][0], poly[0][3][0])
+        p1_left_y_cut = min( poly[0][0][1], poly[0][3][1])
+        p2_left_y_cut = max( poly[0][0][1], poly[0][3][1])
+
+        p1_right_x_cut = min( poly[0][1][0], poly[0][2][0])
+        p2_right_x_cut = max( poly[0][1][0], poly[0][2][0])
+        p1_right_y_cut = min( poly[0][1][1], poly[0][2][1])
+        p2_right_y_cut = max( poly[0][1][1], poly[0][2][1])
+
+        p1_top_x_cut = min( poly[0][0][0], poly[0][1][0])
+        p2_top_x_cut = max( poly[0][0][0], poly[0][1][0])
+        p1_top_y_cut = min( poly[0][0][1], poly[0][1][1])
+        p2_top_y_cut = max( poly[0][0][1], poly[0][1][1])
+
+        p1_bottom_x_cut = min( poly[0][2][0], poly[0][3][0])
+        p2_bottom_x_cut = max( poly[0][2][0], poly[0][3][0])
+        p1_bottom_y_cut = min( poly[0][2][1], poly[0][3][1])
+        p2_bottom_y_cut = max( poly[0][2][1], poly[0][3][1])
     
     # data list
     frame_data = FrameData()
 
-    if show_video:
-        io.show( "\nPress 'q' to terminate...\n" )
+    if show_video: io.show( "\nPress 'q' to terminate...\n" )
+    
 
     # start the frame pointer
     f = jump
@@ -43,9 +66,18 @@ def detect( io, video_file, thresh, laser, poly, show_video, delay, jump ):
     while True:
         # get the frame from the video
         (ret, frame) = capture.read()
+        if not ret:  break
 
-        if not ret:
-            break
+        if fade_margin: 
+            left_avg = np.average( frame[p1_left_y_cut+5:p2_left_y_cut-5, p1_left_x_cut+5:p2_left_x_cut+5] )
+            cv2.line( frame, (poly[0][0][0]-10,poly[0][0][1]-10), (poly[0][3][0]-10,poly[0][3][1]+10), (left_avg,left_avg,left_avg), 20 )
+            right_avg = np.average( frame[p1_right_y_cut+5:p2_right_y_cut-5, p1_right_x_cut-5:p2_right_x_cut-5] )
+            cv2.line( frame, (poly[0][1][0]+10,poly[0][1][1]-10), (poly[0][2][0]+10,poly[0][2][1]+10), (right_avg,right_avg,right_avg), 20 )
+            top_avg = np.average( frame[p1_top_y_cut+5:p2_top_y_cut+5, p1_top_x_cut+5:p2_top_x_cut-5] )
+            cv2.line( frame, (poly[0][0][0]-10,poly[0][0][1]-10), (poly[0][1][0]+10,poly[0][1][1]-10), (top_avg,top_avg,top_avg), 20 )
+            bottom_avg = np.average( frame[p1_bottom_y_cut-5:p2_bottom_y_cut-5, p1_bottom_x_cut+5:p2_bottom_x_cut-5] )
+            cv2.line( frame, (poly[0][3][0]-10,poly[0][3][1]+10), (poly[0][2][0]+10,poly[0][2][1]+10), (bottom_avg,bottom_avg,bottom_avg), 20 )
+        
 
         if (f % 25) == 0:
             io.show_progress( f )
@@ -92,11 +124,12 @@ def detect( io, video_file, thresh, laser, poly, show_video, delay, jump ):
 def _detect_aux( img, mask, mask_not, thresh1, thresh2 ):
 
     data = None
-
     #
     #  get a rough region around the mouse using the first threshold
     #
     (ret, img_bin) = cv2.threshold( img, thresh1, 255, cv2.THRESH_BINARY_INV );
+    #img_bin = cv2.adaptiveThreshold(img,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY_INV, 351, 50)            
+        
 
     cv2.imshow("bin", img_bin)
     
@@ -125,6 +158,8 @@ def _detect_aux( img, mask, mask_not, thresh1, thresh2 ):
 
         # use a stricter threshold
         (ret, small_img_bin) = cv2.threshold( small_img, thresh2, 255, cv2.THRESH_BINARY_INV )
+        #small_img_bin = cv2.adaptiveThreshold(small_img,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY_INV, 351, 50)            
+     
 
         small_mask = mask[miny:maxy, minx:maxx]
         small_img_bin = np.bitwise_and( small_img_bin, small_mask )
@@ -367,3 +402,172 @@ class FixWindow(object):
 
             if not dt.empty:
                 (dt.head, dt.tail) = (dt.tail, dt.head)
+
+
+
+#======================================================================================================================
+# Calculating backbone
+#======================================================================================================================
+
+def __draw_dots( img, data ):
+    if (not data is None) and (not data.empty):
+        cv2.circle( img, data.head, 3, (0, 0, 255), -1 )
+        cv2.circle( img, data.tail,   3, (255, 0, 0), -1 )
+
+        if data.laser_on:
+            cv2.circle( img, data.center, 10, (0, 0, 255), -1 )
+        else:
+            cv2.circle( img, data.center,   3, (0, 255, 0), -1 )
+
+def __cut_roi(img, data):
+    if (not data is None) and (not data.empty):
+        p1 = max(data.center[0]-150, 0), max(data.center[1]-150, 0)
+        p2 = data.center[0]+150, data.center[1]+150
+        rat = img[p1[1]:p2[1], p1[0]:p2[0]]
+        return rat, p1
+    else:
+        return None, None
+
+
+def __rotate_image(img, data, center=None):
+    if (not data is None) and (not data.empty):
+        rad = math.atan2(data.head[1]-data.tail[1], data.head[0]-data.tail[0])
+        deg = math.degrees(rad)
+        return rotate_image(img, deg+90, center)
+    else:
+        return None
+
+
+def __calcbackbone(mask, n_points):
+    mask_height = mask.shape[0]
+    step =  int(math.ceil(float(mask_height)/float(n_points)))
+    backbone = []
+    for i in range(0, mask_height, step):
+        y_cut = i
+        if (y_cut+step)>=mask_height: y_cut = mask_height-step
+        conts, dummy = cv2.findContours(mask[y_cut:y_cut+step].copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE )
+        big = biggestContour(conts)
+        if big!=None and len(big)>=5:
+            big = big + np.array([0, y_cut])
+            center, axes, angle = cv2.fitEllipse(big)
+            center =  int(center[0]) , int(center[1])
+            backbone.append( center )
+    return backbone
+
+def calculate_backbone( io, frame_data, video_file, poly, thresh, show_video, delay, jump, backbone_n_points):
+
+    # split the indivitual thresholds
+    (thresh1, thresh2) = thresh
+
+    # start video capture
+    capture = cv2.VideoCapture( video_file )
+
+    frame_count = capture.get( cv2.cv.CV_CAP_PROP_FRAME_COUNT )
+    frame_height = int(capture.get( cv2.cv.CV_CAP_PROP_FRAME_HEIGHT ))
+    frame_width  = int(capture.get( cv2.cv.CV_CAP_PROP_FRAME_WIDTH ))
+
+    # start the  counter
+    io.start_progress( frame_count )
+
+    # create the mask
+    poly = [np.array( poly, dtype=np.int32 )]
+    mask = make_mask( poly, frame_height, frame_width )
+    mask_not = make_mask_not( poly, frame_height, frame_width )
+
+    if show_video: io.show( "\nPress 'q' to terminate...\n" )
+    
+    data_list = frame_data.get_list()
+
+    # start the frame pointer
+    f = jump
+    if jump > 0: capture.set( cv2.cv.CV_CAP_PROP_POS_FRAMES, jump )
+
+
+    # main loop
+    while True:
+        f = int(capture.get( cv2.cv.CV_CAP_PROP_POS_FRAMES ))
+        # get the frame from the video
+        ret, frame = capture.read()
+        if not ret: break
+        if (f % 25) == 0: io.show_progress( f )
+        data = frame_data.get( f )
+        data_list[f]._n_backbone_points = backbone_n_points
+        data_list[f].backbone = None
+
+        # extract the color information
+        hsv = cv2.cvtColor( frame, cv2.COLOR_RGB2HSV )
+        [hue, sat, img] = cv2.split( hsv )
+        img = cv2.bitwise_and(mask, img)
+        img += mask_not
+        img, first_cut_top_point = __cut_roi( img, data )
+
+        if img!=None:
+
+            (ret, img_bin) = cv2.threshold( img, thresh2, 255, cv2.THRESH_BINARY_INV )
+            (blobs, dummy) = cv2.findContours( img_bin.copy() , cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE )
+            blob = np.concatenate( blobs )
+            rect = cv2.boundingRect(blob)
+            second_cut_top_point = rect[0], rect[1]
+            second_cut_bottom_point = rect[0]+rect[2], rect[1]+rect[3]
+            small_img_bin = img_bin[ second_cut_top_point[1]:second_cut_bottom_point[1], second_cut_top_point[0]:second_cut_bottom_point[0] ]
+            
+            center =    data.center[0] - first_cut_top_point[0]  - second_cut_top_point[0],   data.center[1]    - first_cut_top_point[1]     - second_cut_top_point[1]
+            head =      data.head[0]   - first_cut_top_point[0]  - second_cut_top_point[0],   data.head[1]      - first_cut_top_point[1]     - second_cut_top_point[1]
+            tail =      data.tail[0]   - first_cut_top_point[0]  - second_cut_top_point[0],   data.tail[1]      - first_cut_top_point[1]     - second_cut_top_point[1]
+            
+            center_store = np.zeros_like( small_img_bin )
+            head_store = np.zeros_like( small_img_bin )
+            tail_store = np.zeros_like( small_img_bin )
+            cv2.circle( center_store, center, 5, 255, -1 )
+            cv2.circle( head_store, head, 5, 255, -1 )
+            cv2.circle( tail_store, tail, 5, 255, -1 )
+
+            small_img_bin_rot = __rotate_image( small_img_bin, data )
+            center_store_rot = __rotate_image( center_store, data )
+            head_store_rot = __rotate_image( head_store, data )
+            tail_store_rot = __rotate_image( tail_store, data )
+
+            center_contour = getBiggestContour( center_store_rot )
+            head_contour = getBiggestContour( head_store_rot )
+            tail_contour = getBiggestContour( tail_store_rot )
+
+            center = calcCountourCentroid(center_contour)
+            head = calcCountourCentroid(head_contour)
+            tail = calcCountourCentroid(tail_contour)
+
+            (blobs, dummy) = cv2.findContours( small_img_bin_rot.copy() , cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE )
+            blob = np.concatenate( blobs )
+            rect = cv2.boundingRect(blob)
+            cutP1 = rect[0], rect[1]
+            cutP2 = rect[0]+rect[2], rect[1]+rect[3]
+
+            small_img_bin_rot = small_img_bin_rot[head[1]:tail[1],cutP1[0]:cutP2[0]]
+            backbone = __calcbackbone(small_img_bin_rot, backbone_n_points)
+
+            center = center[0]-cutP1[0], center[1]-head[1]
+            tail = tail[0]-cutP1[0], tail[1]-head[1]
+            head = head[0]-cutP1[0], head[1]-head[1]
+
+            backbone_tmp = [head] + backbone + [tail]
+            if len(backbone_tmp)<(backbone_n_points+2): 
+                for i in range( (backbone_n_points+2)-len(backbone_tmp) ): backbone_tmp += [ (0,0) ]
+            data_list[f].backbone = backbone_tmp
+            
+            if show_video:               
+
+                rat_img = cv2.merge( (small_img_bin_rot,small_img_bin_rot,small_img_bin_rot) )
+                for p in backbone: cv2.circle( rat_img, p, 2, (0, 0, 255), -1 )
+                cv2.circle( rat_img, head, 4, (0, 255, 0), -1 )
+                cv2.circle( rat_img, center, 4, (0, 255, 0), -1 )
+                cv2.circle( rat_img, tail, 4, (0, 255, 0), -1 )
+            
+                cv2.imshow("Rat", rat_img)
+        
+
+        if show_video:    
+            __draw_dots( frame, data)
+            cv2.imshow("Mouse Tracker", frame)
+            key = cv2.waitKey(delay)
+            if key == 113: break
+
+        

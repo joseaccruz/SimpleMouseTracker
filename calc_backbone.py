@@ -8,15 +8,15 @@ from tracker.data import *
 from tracker.utils import *
 
 
-
 # Mandatory function to work with 'generic_gui' module. Should return a fully parametrized 'Command' object.
 def cfg():
-    command = Command( "Track" )
+    command = Command( "Calc backbone" )
     command.add_arg( Argument( name="Project File",  atype="dir",  cmd_name="project",  desc="project directory name" ) )
     command.add_arg( Argument( name="Show Video",    atype="bool", cmd_name="--show_video", cmd_option="-s", default=True, desc="show the video while processing." ) )
     command.add_arg( Argument( name="Frame delay",   atype="int",  cmd_name="--delay",      cmd_option="-d", default=1, minimum=0, maximum=100000,    desc="set the delay between frames (ms)." ) )
     command.add_arg( Argument( name="Jump to frame", atype="int",  cmd_name="--jump",       cmd_option="-j", default=0, minimum=0, maximum=100000,    desc="jump to a specific frame." ) )
-    command.add_arg( Argument( name="Fade margin",    atype="bool", cmd_name="--fade_margin", cmd_option="-f", default=True, desc="Paint the mask border with a margin average color." ) )
+    command.add_arg( Argument( name="Number of backbone points", atype="int",  cmd_name="--backbone", cmd_option="-b", default=10, minimum=2, maximum=100000,    desc="set the number of backbone points." ) )
+    #command.add_arg( Argument( name="Path to export rat images", atype="str",  cmd_name="--exportimages", cmd_option="-x", default=None, desc="Path to where the rat images should be saved" ) )
     
     return command
 
@@ -26,18 +26,14 @@ def run( args, io ):
     check_dir( io, args.project, "Project File" )
     prj = Project( args.project )
 
-    print args.fade_margin
-    # analyses the video file
-    frame_data = detect( io, prj.video_file, prj.thresh, prj.laser, prj.poly, args.show_video, args.delay, args.jump, args.fade_margin )
+    io.show( "\nReading data..." )
+    frame_data = FrameData( prj.data_file )
+    io.show( "[Data ok]\n" )
 
-    # Try to fix the head-tail choices
-    #show( "Fixing the data. Wait a few seconds, please...\n" )
-    #frame_data = analysis.fix( frame_data )
+    calculate_backbone( io, frame_data, prj.video_file, prj.poly, prj.thresh, args.show_video, args.delay, args.jump, args.backbone)
 
-    # save the frame data
     frame_data.save( prj.data_file )
-
-    io.show( "Data saved to '%s'.\n" %prj.data_file )
+    io.show( "[DONE]\n" )
 
     cv2.destroyAllWindows()
 

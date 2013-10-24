@@ -12,7 +12,7 @@ def cfg():
 	command = Command( "New" )
 	command.add_arg( Argument( name="Project File", atype="dir",  cmd_name="project",  desc="project directory name" ) )
 	command.add_arg( Argument( name="Video File",   atype="file", cmd_name="video",    desc="input video full name" ) )
-	command.add_arg( Argument( name="Polygon",      atype="str",  cmd_name="--poly",  cmd_option="-p", default="[[136, 28], [573, 31], [566,464], [132, 460]]", desc='set the polygon data (e.g. "[[0,0],[0,10],[10,10],[10,0]]").' ) )
+	command.add_arg( Argument( name="Polygon",      atype="str",  cmd_name="--poly",  cmd_option="-p", default="[[137,32], [572,36], [568,469], [135,465]]", desc='set the polygon data (e.g. "[[0,0],[0,10],[10,10],[10,0]]").' ) )
         
 	return command
 
@@ -29,7 +29,7 @@ def run( args, io ):
 
         exec( "poly=" + args.poly )
 
-        prj = Project.new( args.project, os.path.realpath( args.video ), poly, [70, 70], (20, 20, 5, 255, False) )
+        prj = Project.new( args.project, os.path.realpath( args.video ), poly, [90, 70], (20, 20, 5, 255, False) )
         prj.save()
 
         io.show( "DONE!\n" )

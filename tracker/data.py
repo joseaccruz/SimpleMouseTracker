@@ -15,9 +15,7 @@ class Project(object):
         # loads the project file from the directory
         if Project.is_project( dir_name ):
             self._dir_name = dir_name
-
             data = json.load( open( dir_name + os.sep + "project.cfg" ) )
-
             for key in self._data_keys:        
                 self.__dict__[key] = data.get( key, None )
 
@@ -150,6 +148,7 @@ class FrameData(object):
         for (frame, dt) in enumerate( self._data ):
             fo.write( "%d\t%s\n" %(frame, str(dt)) )
         fo.close()
+        pass
 
     def load( self, fname ):
         self._data = []
@@ -157,31 +156,46 @@ class FrameData(object):
         data = map( lambda s: s.strip().split( '\t' ), open( fname ).read().strip().split( '\n' ) )
 
         for (frame, dt) in enumerate(data):
-            if len(dt) != 9:
-                error( "Wrong number of fields in data file '%s' frame '%d. Expected 10 found %d." %(fname, frame, len(dt[1:])) )
+            #if len(dt) != 9 and len(dt) != 10:
+            #    error( "Wrong number of fields in data file '%s' frame '%d. Expected 10 found %d." %(fname, frame, len(dt[1:])) )
 
             if int(dt[0]) != frame:
                 error( "Wrong frame number in data file '%s'. Expected %d found %d." %(fname, frame, int(dt[0])) )
 
-            self._data.append( FrameDataItem.from_array( map( int, dt[1:] ) ) )
+            if len(dt)==10: data = map( int, dt[1:9] ) + [eval(dt[9])]
+            else: data = map( int, dt[1:9] ) + [None]
+           
+            self._data.append( FrameDataItem.from_array( data ) )
 
 # ======================================================================================================================
 # Frame Data Entry
 # ======================================================================================================================
 class FrameDataItem(object):
-    def __init__( self, center=None, head=None, tail=None, laser_on=0 ):
+    def __init__( self, center=None, head=None, tail=None, laser_on=0, backbone=None):
         self._empty = (center is None) or (head is None) or (tail is None)
         self._center = center
         self._head = head
         self._tail = tail
         self._laser_on = laser_on
+        self._backbone = backbone
+        self._n_backbone_points = 10
 
     def __str__( self ):
-        if self._empty:
-            txt = "0\t0\t0\t0\t0\t0\t0\t0"
-        else:
-            txt = "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d" %(not self._empty, self._center[0], self._center[1], self._head[0], self._head[1], self._tail[0], self._tail[1], self._laser_on)
 
+        extra_points = "\t".join( map(lambda x: ("%d\t%d" % (x[0],x[1])), [(0,0) for x in range(self._n_backbone_points+2)] ))
+        if not hasattr(self, 'backbone'):
+            print extra_points
+            if self._empty:
+                txt = "0\t0\t0\t0\t0\t0\t0\t0\t%s" % extra_points
+            else:
+                txt = "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%s" % (not self._empty, self._center[0], self._center[1], self._head[0], self._head[1], self._tail[0], self._tail[1], self._laser_on, extra_points)
+        else:
+            if self._empty:
+                txt = "0\t0\t0\t0\t0\t0\t0\t0\t" + extra_points
+            else:
+                if self.backbone!=None: extra_points = "\t".join( map( lambda x: ("%d\t%d" % (x[0],x[1])) ,  self.backbone ) )
+                txt = "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%s" %(not self._empty, self._center[0], self._center[1], self._head[0], self._head[1], self._tail[0], self._tail[1], self._laser_on, extra_points)
+        
         return txt
 
     @staticmethod
@@ -230,3 +244,10 @@ class FrameDataItem(object):
     head = property( _get_head, _set_head )
     tail = property( _get_tail, _set_tail )
     laser_on = property( _get_laser_on, _set_laser_on )
+
+
+    @property
+    def backbone(self): return self._backbone
+
+    @backbone.setter
+    def backbone(self, value): self._backbone = value
