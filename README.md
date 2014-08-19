@@ -151,7 +151,7 @@ When done a new `/home/user/myprjs/test/coords.dat` will be saved.
 
     $ python /home/user/mt/calc_backbone.py /home/user/myprjs/test -b 5
 
-    This will calculate the line that divide the mouse blob in half, basing in N number of points (option -b).
+This will calculate the line that divide the mouse blob in half, basing in N number of points (option -b).
 
 # Have Fun
     
